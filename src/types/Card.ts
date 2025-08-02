@@ -1,0 +1,22 @@
+export type Card = {
+    id: number;
+    elementId: number;
+    title: string;
+    field_artistTitle: string;
+    field_productTitle: string;
+    field_cardDesc: string;
+    field_rare_tzsrperf: string;
+    field_hp_zbxcocvx: string | null;
+    field_cardNo_suyeowsc: string;
+    field_grade: string;
+    cardImage: string;
+    productCategory: string;
+    productCategoryTitle: string;
+    postDate: number;
+    cardType?: string;
+    cardTypeTitle?: string;
+    energyType: string;
+    energyTypeTitle: string;
+    cardLevel?: string;
+    cardLevelTitle?: string;
+  };

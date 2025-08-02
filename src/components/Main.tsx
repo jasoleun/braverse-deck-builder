@@ -1,8 +1,8 @@
-import { Group, Button, TextInput, Text, ActionIcon } from "@mantine/core";
+import { Group, Button, TextInput, Text, ActionIcon, Grid, AppShell } from "@mantine/core";
 
-export default function MainContent() {
+export default function Main() {
   return (
-    <>
+    <AppShell.Main>
       <Group>
         <TextInput size="lg" />
         <Button size="md">Save</Button>
@@ -16,6 +16,9 @@ export default function MainContent() {
         <ActionIcon size="md">3</ActionIcon>
         <ActionIcon size="md">4</ActionIcon>
       </Group>
-    </>
+      <Grid>
+
+      </Grid>
+    </AppShell.Main>
   );
 }

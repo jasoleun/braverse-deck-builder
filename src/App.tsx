@@ -2,9 +2,10 @@ import { AppShell } from "@mantine/core";
 import "@mantine/core/styles.css";
 import { MantineProvider } from "@mantine/core";
 import "./App.css";
-import AsideContent from "./components/AsideContent";
-import HeaderContent from "./components/HeaderContent";
-import MainContent from "./components/MainContent";
+import Aside from "./components/Aside";
+import Header from "./components/Header";
+import Main from "./components/Main";
+import Navbar from "./components/Navbar";
 
 function App() {
   return (
@@ -21,16 +22,10 @@ function App() {
         }}
         padding="md"
       >
-        <AppShell.Header>
-          <HeaderContent/>
-        </AppShell.Header>
-        <AppShell.Main>
-          <MainContent/>
-        </AppShell.Main>
-        <AppShell.Navbar p="md"></AppShell.Navbar>
-        <AppShell.Aside p="md">
-          <AsideContent/>
-        </AppShell.Aside>
+        <Header />
+        <Navbar />
+        <Main />
+        <Aside />
         <AppShell.Footer hiddenFrom="md">Footer</AppShell.Footer>
       </AppShell>
     </MantineProvider>
