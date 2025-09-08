@@ -1,230 +1,152 @@
 import {
-  ActionIcon,
   AppShell,
+  MantineProvider,
+  em,
   Button,
   Group,
-  Tabs,
-  TextInput,
-  UnstyledButton,
-  Text,
   SimpleGrid,
+  TextInput,
+  Image,
   ScrollArea,
-  MantineProvider,
-  Box,
-  Badge,
+  Indicator,
 } from "@mantine/core";
 import "@mantine/core/styles.css";
-import "./App.css";
+import { useMediaQuery } from "@mantine/hooks";
 import { useState } from "react";
-import cardData from "./assets/card.json";
-import ResultCard from "./components/ResultCard";
-import { DndContext, DragOverlay, useDroppable } from "@dnd-kit/core";
-import Draggable from "./components/Draggable";
-
-const DroppableGrid = ({
-  id,
-  cards,
-  counts = {} as Record<string, number>,
-  prefix = "",
-  unique = false,
-  bgColor = "#1e1e1e",
-  cols = 4,
-}: {
-  id: string;
-  cards: string[];
-  counts?: Record<string, number>;
-  prefix?: string;
-  unique?: boolean;
-  bgColor?: string;
-  cols?: number;
-}) => {
-  const { setNodeRef } = useDroppable({ id });
-
-  const displayCards = unique ? Array.from(new Set(cards)) : cards;
-
-  return (
-    <ScrollArea offsetScrollbars style={{ flex: 1, minHeight: 0, marginTop: 16 }}>
-      <SimpleGrid
-        ref={setNodeRef}
-        cols={cols}
-        spacing="sm"
-        style={{
-          minHeight: 0,
-          borderRadius: 8,
-          padding: 8,
-          backgroundColor: bgColor,
-        }}
-      >
-        {displayCards.map((cardId, index) => (
-          <Draggable key={`${prefix}-${cardId}`} id={`${prefix}-${index}-${cardId}`}>
-            <Box style={{ position: "relative" }}>
-              <ResultCard cardNo={cardId} />
-              {counts[cardId] ? (
-                <Badge
-                  variant="filled"
-                  color="blue"
-                  size="sm"
-                  style={{ position: "absolute", top: 4, right: 4 }}
-                >
-                  {counts[cardId]}
-                </Badge>
-              ) : null}
-            </Box>
-          </Draggable>
-        ))}
-      </SimpleGrid>
-    </ScrollArea>
-  );
-};
+import CardsJSON from "./assets/card.json";
+import { DndContext, DragOverlay } from "@dnd-kit/core";
+import { Draggable } from "./components/Draggable.tsx";
+import { Droppable } from "./components/Droppable.tsx";
+import type { Card } from "./types/Card.ts";
 
 export default function App() {
-  const [input, setInput] = useState(""),
-    [searchCards, setSearchCards] = useState<string[]>([]),
-    [deckCards, setDeckCards] = useState<string[]>([]),
-    [activeId, setActiveId] = useState<string | null>(null);
+  const cardLookup: Map<number, Card> = new Map(
+    CardsJSON.map((card) => [card.id, card])
+  );
 
-  const beginSearch = (v: string) =>
-    setSearchCards(
-      cardData
-        .filter((c) => c.title.toLowerCase().includes(v.toLowerCase()))
-        .map((c) => c.field_cardNo_suyeowsc)
+  const isMobile = useMediaQuery(`(max-width: ${em(1200)})`);
+
+  const [query, setQuery] = useState<string>("");
+  const [resultIds, setResultIds] = useState<number[]>([]);
+
+  function handleSearch() {
+    setResultIds(
+      CardsJSON.filter((card) =>
+        card.title.toLowerCase().includes(query.toLowerCase())
+      ).map((card) => card.id)
     );
+  }
 
-  const deckCounts: Record<string, number> = {};
-  deckCards.forEach((id) => {
-    deckCounts[id] = (deckCounts[id] || 0) + 1;
-  });
+  const [deck, setDeck] = useState<Map<number, number>>(new Map());
 
-  const handleDragEnd = (event: any) => {
-    const { active, over } = event;
-    setActiveId(null);
-    if (!over) return;
+  function cardGrid(gridId: string, cols: number, cardIds: number[]) {
+    const cardImgs =
+      gridId === "deck"
+        ? cardIds.map((cardId) => (
+          <Indicator position="bottom-end" size="md" label={deck.get(cardId)}>
+            <Draggable
+              image={cardLookup.get(cardId)?.cardImage}
+              key={`${gridId}-${cardId}`}
+              id={`${gridId}-${cardId}`}
+              lookupId={cardId}
+            />
+          </Indicator>
+          ))
+        : cardIds.map((cardId) => (
+            <Draggable
+              image={cardLookup.get(cardId)?.cardImage}
+              key={`${gridId}-${cardId}`}
+              id={`${gridId}-${cardId}`}
+              lookupId={cardId}
+            />
+          ));
+    return (
+      <Droppable id={gridId}>
+        <SimpleGrid cols={cols}>{cardImgs}</SimpleGrid>
+      </Droppable>
+    );
+  }
 
-    const cardId = String(active.id).replace(/^search-\d+-|^deck-\d+-/, "");
+  const [activeId, setActiveId] = useState<number | null>(null);
+  const [activeImg, setActiveImg] = useState<string | null>(null);
+  const [lookupId, setLookupId] = useState<number | null>(null);
 
-    if (over.id === "deck") {
-      const totalCards = deckCards.length;
-      const count = deckCards.filter((id) => id === cardId).length;
-      if (count < 4 && totalCards < 60) {
-        setDeckCards((prev) => [...prev, cardId]);
+  function handleDragStart(event: any) {
+    const { active } = event;
+    setActiveId(event.active.id);
+    setActiveImg(active.data.current.image);
+    setLookupId(active.data.current.lookupId);
+  }
+
+  function handleDragEnd(event: any) {
+    if (!event.over || activeId == null || lookupId == null) return;
+    const newMap = new Map(deck);
+    if (event.over.id === "deck") {
+      if (!deck.has(lookupId)) {
+        newMap.set(lookupId, 1);
+      } else if ((deck.get(lookupId) ?? 0) < 4) {
+        newMap.set(lookupId, (deck.get(lookupId) ?? 0) + 1);
       }
     }
-
-    if (over.id === "search") {
-      const index = deckCards.findIndex((id) => id === cardId);
-      if (index !== -1)
-        setDeckCards((prev) => {
-          const copy = [...prev];
-          copy.splice(index, 1);
-          return copy;
-        });
+    if (event.over.id === "results" && deck.has(lookupId)) {
+      if ((deck.get(lookupId) ?? 0) > 1) {
+        newMap.set(lookupId, (deck.get(lookupId) ?? 0) - 1);
+      }
+      if ((deck.get(lookupId) ?? 0) == 1) {
+        newMap.delete(lookupId);
+      }
     }
-  };
+    setDeck(newMap);
+    setActiveId(null);
+    setLookupId(null);
+  }
 
   return (
     <MantineProvider defaultColorScheme="dark">
       <AppShell
         header={{ height: 60 }}
-        navbar={{ width: 400, breakpoint: "xl" }}
-        aside={{ width: 600, breakpoint: "lg" }}
+        footer={{ height: 60, collapsed: isMobile ? false : true }}
+        navbar={{
+          width: 400,
+          breakpoint: "xl",
+          collapsed: { desktop: false, mobile: true },
+        }}
+        aside={{
+          width: 575,
+          breakpoint: "lg",
+          collapsed: { desktop: false, mobile: true },
+        }}
         padding="md"
       >
-        <AppShell.Header>
-          <Group h="100%" px="md">
-            {["My Decks", "Deck Builder"].map((t) => (
-              <UnstyledButton key={t}>{t}</UnstyledButton>
-            ))}
-          </Group>
-        </AppShell.Header>
-
-        <AppShell.Navbar p="md" />
-
-        <DndContext
-          onDragStart={(e) => setActiveId(String(e.active.id))}
-          onDragEnd={handleDragEnd}
-        >
-          <AppShell.Main>
-            <Group>
-              {["Save", "Share", "Tools"].map((t) => (
-                <Button key={t}>{t}</Button>
-              ))}
-            </Group>
-
-            <Group>
-              <Text>{deckCards.length} cards in deck</Text>
-              {[1, 2, 3, 4].map((n) => (
-                <ActionIcon key={n}>{n}</ActionIcon>
-              ))}
-            </Group>
-
-              <DroppableGrid
-                id="deck"
-                cards={deckCards}
-                counts={deckCounts}
-                prefix="deck"
-                unique
-                bgColor="#2a2a2a"
-                cols={6}
-              />
+        <AppShell.Header p="md">Header</AppShell.Header>
+        <AppShell.Navbar p="md">Navbar</AppShell.Navbar>
+        <DndContext onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+          <AppShell.Main style={{ display: "flex", flexDirection: "column" }}>
+            {cardGrid("deck", isMobile ? 4 : 8, [...deck.keys()])}
           </AppShell.Main>
-
-          <AppShell.Aside p="md">
-            <Tabs
-              defaultValue="Search"
-              style={{ display: "flex", flexDirection: "column", height: "100%" }}
-            >
-              <Tabs.List>
-                {["Search", "Favorites"].map((t) => (
-                  <Tabs.Tab key={t} value={t}>
-                    {t === "Search" ? "Card Search" : "Favorites"}
-                  </Tabs.Tab>
-                ))}
-              </Tabs.List>
-
-              <Tabs.Panel
-                value="Search"
-                style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}
-              >
-                <Group wrap="nowrap">
-                  <TextInput
-                    size="lg"
-                    value={input}
-                    onChange={(e) => setInput(e.target.value)}
-                    onKeyDown={(e) =>
-                      e.key === "Enter" && beginSearch(input)
-                    }
-                    style={{ flexGrow: 1 }}
-                  />
-                  <Button
-                    size="lg"
-                    style={{ flexGrow: 0 }}
-                    onClick={() => beginSearch(input)}
-                  >
-                    Search
-                  </Button>
-                </Group>
-
-                <Text>{searchCards.length} cards found</Text>
-
-                  <DroppableGrid
-                    id="search"
-                    cards={searchCards}
-                    prefix="search"
-                    bgColor="#1e1e1e"
-                    cols={4}
-                  />
-              </Tabs.Panel>
-
-              <Tabs.Panel value="Favorites">Favs</Tabs.Panel>
-            </Tabs>
+          <AppShell.Aside>
+            <Group p="md">
+              <TextInput
+                size="md"
+                flex={1}
+                onChange={(event) => setQuery(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") handleSearch();
+                }}
+              />
+              <Button size="md" onClick={() => handleSearch()}>
+                Search
+              </Button>
+            </Group>
+            <ScrollArea p="md">{cardGrid("results", 4, resultIds)}</ScrollArea>
           </AppShell.Aside>
-
           <DragOverlay>
-            {activeId && <ResultCard cardNo={activeId.replace(/^search-\d+-|^deck-\d+-/, "")} />}
+            {activeId ? (
+              <Image src={"/braverse-deck-builder/cards/" + activeImg} />
+            ) : null}
           </DragOverlay>
         </DndContext>
-
-        <AppShell.Footer hiddenFrom="md">Footer</AppShell.Footer>
+        <AppShell.Footer p="md">Footer</AppShell.Footer>
       </AppShell>
     </MantineProvider>
   );
