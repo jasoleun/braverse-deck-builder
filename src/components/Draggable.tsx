@@ -7,16 +7,18 @@ export function Draggable(props: any) {
     data: {
       image: props.image,
       lookupId: props.lookupId,
-      index: props.index,
+      from: props.from,
+      onclick: props.onclick
     },
   });
 
   return (
     <Image
-      src={"/braverse-deck-builder/cards/" + props.image}
+      src={props.image}
       ref={setNodeRef}
       {...listeners}
       {...attributes}
+      onClick={props.onclick}
     />
   );
 }
