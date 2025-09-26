@@ -14,7 +14,7 @@ export default function replaceIcons(desc: string) {
     (result, key) =>
       result.replaceAll(
         key,
-        `<img src="${iconMap[key]}" style="height:1em;display:inline;" />`
+        `<img src="${iconMap[key]}" style="height:1em;display:inline;vertical-align: middle;" />`
       ),
     desc
   );

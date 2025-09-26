@@ -12,10 +12,14 @@ import {
   Text,
   Stack,
   ActionIcon,
+  Container,
+  Box,
+  UnstyledButton,
+  Tabs,
 } from "@mantine/core";
 import "@mantine/core/styles.css";
 import { useMediaQuery } from "@mantine/hooks";
-import { useState } from "react";
+import { forwardRef, useState } from "react";
 import CardsJSON from "./assets/card.json";
 import {
   DndContext,
@@ -28,10 +32,16 @@ import { Draggable } from "./components/Draggable.tsx";
 import { Droppable } from "./components/Droppable.tsx";
 import type { Card } from "./types/Card.ts";
 import parse from "html-react-parser";
-import { IconDotsVertical, IconHeart } from "@tabler/icons-react";
+import {
+  IconDotsVertical,
+  IconHeart,
+  IconArrowBackUp,
+  IconChevronDown,
+  IconReload,
+} from "@tabler/icons-react";
 import getImg from "./functions/getImg.ts";
 import replaceIcons from "./functions/replaceIcons.ts";
-import { Grid, type CellComponentProps } from "react-window";
+import { VirtuosoGrid } from "react-virtuoso";
 
 export default function App() {
   const sensors = useSensors(
@@ -87,43 +97,85 @@ export default function App() {
           ))
         : cardIds.map((cardId) => dragCard(gridId, cardId));
     return (
-      <Droppable id={gridId}>
+      <Droppable style={{}} id={gridId}>
         <SimpleGrid cols={cols}>{cardImgs}</SimpleGrid>
       </Droppable>
     );
   }
 
-  function Example(contacts: number[], columnCount: number) {
-    return (
-      <Grid
-        cellComponent={CellComponent}
-        cellProps={{ columnCount, contacts }}
-        columnCount={columnCount}
-        columnWidth={200}
-        rowCount={Math.ceil(contacts.length / columnCount)}
-        rowHeight={200}
-      />
-    );
+  type DivProps = React.HTMLAttributes<HTMLDivElement>;
+
+  const gridComponents = {
+    List: forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
+      ({ style, children, ...props }, ref) => (
+        <div
+          ref={ref}
+          {...props}
+          style={{
+            display: "flex",
+            flexWrap: "wrap",
+            ...style,
+          }}
+        >
+          {children}
+        </div>
+      )
+    ),
+    Item: ({ children, ...props }: React.PropsWithChildren<DivProps>) => (
+      <div
+        {...props}
+        style={{
+          padding: "0.5rem",
+          width: "25%",
+          display: "flex",
+          flex: "none",
+          alignContent: "stretch",
+          boxSizing: "border-box",
+        }}
+      >
+        {children}
+      </div>
+    ),
+  };
+
+  const ItemWrapper = ({
+    children,
+    style,
+    ...props
+  }: React.PropsWithChildren<DivProps>) => (
+    <div
+      {...props}
+      style={{
+        display: "flex",
+        flex: 1,
+        textAlign: "center",
+        padding: "0.1rem 0.1rem",
+        whiteSpace: "nowrap",
+      }}
+    >
+      {children}
+    </div>
+  );
+
+  function addToDeck(cardId: number) {
+    const newMap = new Map(deck);
+    if (!deck.has(cardId)) {
+      newMap.set(cardId, 1);
+    } else if ((deck.get(cardId) ?? 0) < 4) {
+      newMap.set(cardId, (deck.get(cardId) ?? 0) + 1);
+    }
+    setDeck(newMap);
   }
 
-  function CellComponent({
-    columnCount,
-    contacts,
-    columnIndex,
-    rowIndex,
-    style,
-  }: CellComponentProps<{
-    columnCount: number;
-    contacts: number[];
-  }>) {
-    const content = contacts[rowIndex * columnCount + columnIndex];
-    return (
-      <div className="truncate" style={style}>
-        {content > contacts.length ? (
-          <Image src={getImg(cardLookup.get(content)?.cardImage)} />
-        ) : null}
-      </div>
-    );
+  function removeFromDeck(cardId: number) {
+    const newMap = new Map(deck);
+    if ((deck.get(cardId) ?? 0) > 1) {
+      newMap.set(cardId, (deck.get(cardId) ?? 0) - 1);
+    }
+    if ((deck.get(cardId) ?? 0) == 1) {
+      newMap.delete(cardId);
+    }
+    setDeck(newMap);
   }
 
   const [activeId, setActiveId] = useState<number | null>(null);
@@ -143,31 +195,77 @@ export default function App() {
       active.data.current.lookupId == null
     )
       return;
-    const newMap = new Map(deck);
     if (event.over.id === "deck" && active.data.current.from === "results") {
-      if (!deck.has(active.data.current.lookupId)) {
-        newMap.set(active.data.current.lookupId, 1);
-      } else if ((deck.get(active.data.current.lookupId) ?? 0) < 4) {
-        newMap.set(
-          active.data.current.lookupId,
-          (deck.get(active.data.current.lookupId) ?? 0) + 1
-        );
-      }
+      addToDeck(active.data.current.lookupId);
     }
     if (event.over.id === "results" && active.data.current.from === "deck") {
-      if ((deck.get(active.data.current.lookupId) ?? 0) > 1) {
-        newMap.set(
-          active.data.current.lookupId,
-          (deck.get(active.data.current.lookupId) ?? 0) - 1
-        );
-      }
-      if ((deck.get(active.data.current.lookupId) ?? 0) == 1) {
-        newMap.delete(active.data.current.lookupId);
-      }
+      removeFromDeck(active.data.current.lookupId);
     }
-    setDeck(newMap);
     setActiveId(null);
   }
+
+  function cardSummary() {
+    return (
+      <Stack>
+        <Stack>
+          <Group justify="space-between">
+            <Stack gap="xs">
+              <Text size="xl">{cardLookup.get(clickedId)?.title}</Text>
+              <Text size="sm">
+                {cardLookup.get(clickedId)?.field_cardNo_suyeowsc}
+              </Text>
+            </Stack>
+            <Group gap="xs">
+              <ActionIcon variant={"default"} size="lg">
+                <IconHeart />
+              </ActionIcon>
+              <ActionIcon variant={"default"} size="lg">
+                <IconDotsVertical />
+              </ActionIcon>
+            </Group>
+          </Group>
+          <Button.Group borderWidth={1}>
+            <Button
+              flex={1}
+              variant="default"
+              onClick={() => removeFromDeck(clickedId)}
+            >
+              -1
+            </Button>
+            <Button.GroupSection flex={2} variant="default">
+              {deck.get(clickedId) ? deck.get(clickedId) : 0} in deck
+            </Button.GroupSection>
+            <Button
+              flex={1}
+              variant="default"
+              onClick={() => addToDeck(clickedId)}
+            >
+              +1
+            </Button>
+          </Button.Group>
+        </Stack>
+        <ScrollArea>
+          <Stack>
+            <Image src={getImg(cardLookup.get(clickedId)?.cardImage)} />
+            <Text>
+              {parse(
+                replaceIcons(cardLookup.get(clickedId)?.field_cardDesc ?? "")
+              )}
+            </Text>
+          </Stack>
+        </ScrollArea>
+      </Stack>
+    );
+  }
+
+  const deckSum = () => {
+    let sum = 0;
+
+    deck.forEach((value) => {
+      sum += value;
+    });
+    return sum;
+  };
 
   return (
     <MantineProvider defaultColorScheme="dark">
@@ -186,40 +284,18 @@ export default function App() {
         }}
         padding="md"
       >
-        <AppShell.Header p="md">Header</AppShell.Header>
+        <AppShell.Header p="xs">
+          <Group h="100%">
+            <Image
+              src={"braverse-deck-builder/logo_en.webp"}
+              h="100%"
+              w="auto"
+              fit="contain"
+            />
+          </Group>
+        </AppShell.Header>
         <AppShell.Navbar p="md">
-          <Stack>
-            <Group justify="space-between">
-              <Stack gap="xs">
-                <Text size="xl">{cardLookup.get(clickedId)?.title}</Text>
-                <Text size="sm">
-                  {cardLookup.get(clickedId)?.field_cardNo_suyeowsc}
-                </Text>
-              </Stack>
-              <Group gap="xs">
-                <ActionIcon variant="filled" size="lg" radius="md">
-                  <IconHeart />
-                </ActionIcon>
-                <ActionIcon variant="filled" size="lg" radius="md">
-                  <IconDotsVertical />
-                </ActionIcon>
-              </Group>
-            </Group>
-            <ScrollArea>
-              <Stack>
-                {clickedId ? (
-                  <Image src={getImg(cardLookup.get(clickedId)?.cardImage)} />
-                ) : null}
-                <Text>
-                  {parse(
-                    replaceIcons(
-                      cardLookup.get(clickedId)?.field_cardDesc ?? ""
-                    )
-                  )}
-                </Text>
-              </Stack>
-            </ScrollArea>
-          </Stack>
+          {clickedId ? cardSummary() : null}
         </AppShell.Navbar>
         <DndContext
           onDragStart={handleDragStart}
@@ -232,25 +308,79 @@ export default function App() {
               flexDirection: "column",
             }}
           >
-            {cardGrid("deck", isMobile ? 4 : 8, [...deck.keys()])}
-            {Example(resultIds, 4)}
+            <Stack flex={1}>
+              <Group justify="space-between">
+                <Group>
+                  <Button variant="outline" color="gray"></Button>
+                  <TextInput value={"New Deck"} />
+                </Group>
+                <Group>
+                  <Button.Group>
+                    <Button variant={"default"}>Save</Button>
+                    <Button variant={"default"}>
+                      <IconArrowBackUp />
+                    </Button>
+                  </Button.Group>
+                  <Button
+                    variant={"default"}
+                    rightSection={<IconChevronDown />}
+                  >
+                    Share
+                  </Button>
+                  <Button
+                    variant={"default"}
+                    rightSection={<IconChevronDown />}
+                  >
+                    Tools
+                  </Button>
+                  <Button variant={"default"}>Playtest</Button>
+                </Group>
+              </Group>
+              <Group>
+                <Text>{deckSum()} cards</Text>
+              </Group>
+              {cardGrid("deck", isMobile ? 4 : 8, [...deck.keys()])}
+            </Stack>
           </AppShell.Main>
           <AppShell.Aside p="md">
-            <Group>
-              <TextInput
-                size="md"
-                flex={1}
-                onChange={(event) => setQuery(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter") handleSearch();
-                }}
-              />
-              <Button size="md" onClick={() => handleSearch()}>
-                Search
-              </Button>
-            </Group>
-            <Text>{resultIds.length} cards found</Text>
-            <ScrollArea>{cardGrid("results", 4, resultIds)}</ScrollArea>
+            <Stack flex={1}>
+              <Group>
+                <TextInput
+                  size="md"
+                  flex={1}
+                  onChange={(event) => setQuery(event.currentTarget.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") handleSearch();
+                  }}
+                />
+                <Button
+                  size="md"
+                  variant={"default"}
+                  onClick={() => handleSearch()}
+                >
+                  Search
+                </Button>
+              </Group>
+              <Group justify="center">
+                <Button variant="default" rightSection={<IconChevronDown />}>Search Filter</Button>
+                <Button variant="default">Advanced Search</Button>
+                <ActionIcon size="lg" variant="default"><IconReload/></ActionIcon>
+                <ActionIcon size="lg" variant="default"><IconDotsVertical/></ActionIcon>
+              </Group>
+              <Droppable id="results">
+                <Text>{resultIds.length} cards found</Text>
+                <VirtuosoGrid
+                  style={{ height: "100%" }}
+                  totalCount={resultIds.length}
+                  components={gridComponents}
+                  itemContent={(index) => (
+                    <ItemWrapper>
+                      {dragCard("results", resultIds[index])}
+                    </ItemWrapper>
+                  )}
+                />
+              </Droppable>
+            </Stack>
           </AppShell.Aside>
           <DragOverlay>
             {activeId ? <Image src={activeImg} /> : null}
